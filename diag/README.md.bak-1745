@@ -1,0 +1,47 @@
+# Build Night Trailer
+
+A cinematic 60–90 s trailer of everything TokenMax built on Oct 7, 2026 from Boyd's leftover Grok Bot usage.
+
+| Output | Path |
+|---|---|
+| 1080p30 H.264 + AAC MP4 | `out/build-night-trailer-1080p.mp4` |
+| 720p GIF (kept under 15 MB) | `out/build-night-trailer-720p.gif` |
+| Contact sheet, one frame per segment | `out/contact-sheet.png` |
+| What went in: projects, screenshots, pitches, stats, timeline | `out/manifest.json` |
+
+## Re-render at the end of the night
+```bash
+./make_trailer.sh --scan   # preview which projects, screenshots and pitches would be used
+./make_trailer.sh          # full render (10–30 min, depending on how busy the box is)
+```
+Each render re-scans `/workspace/tokenmax/*/`. Any folder with a `README.md` **and** at least one image in `screenshots/` gets its own segment, so projects that finish later are picked up automatically. Stats are re-measured and `usage.json` is re-read on every render. **Refresh `usage.json` before the final render**, because the gauge shows whatever that file says.
+
+## Structure
+1. **Title card:** "TokenMax presents: Build Night, Oct 7, 2026" over a generated starfield with a slow push-in.
+2. **One segment per project,** 5–8 s, scaled so the whole trailer lands near 76 s. Each segment has:
+   - 2–3 screenshots with Ken Burns moves (ffmpeg `zoompan` on 3× upscaled frames for smooth motion) and an `xfade` between them.
+   - The project name and a one-line pitch taken from the start of its README. Long pitches are trimmed at a clause and end in "…".
+   - A meta line with that project's measured lines of code, screenshots and test files.
+   - `drawtext` for the "03 / 13" counter and the "TOKENMAX · BUILD NIGHT" tag.
+
+   Projects appear in the order they were finished (newest README or screenshot last), with the Hub at the end.
+   **When there are too many projects for 5 s each within 90 s** (more than about 17), the 90 s cap wins: the title, stats and end cards get shorter (4.0 / 6.5 / 4.0 s), and every project gets an equal share, never under 3.6 s, with 2 screenshots each. `out/manifest.json` records this in `fit_note`.
+3. **The night in numbers:** projects, files, lines of code, screenshots and test files counting up, plus the usage gauge from `usage.json`.
+4. **End card:** "Built before the reset."
+
+All segments are joined with `xfade` transitions.
+
+**Screenshot picks:** the README's first embedded screenshot comes first, then the most visually rich ones (colour plus edge density). The picker skips near-duplicates by name family and skips offline/snapshot/sources/outage/empty frames.
+
+**Music:** synthesized with sox. Pads are an Am–F–C–G progression of triangle and sine voices with lowpass, chorus and reverb. The beat is a soft sine kick, a band-passed noise tick and hats at 84 BPM. It comes in after the title and drops out for the end card. Loudness is normalized quietly (`loudnorm` I=−24 LUFS, true peak −3 dB).
+
+## How the stats are measured (never typed in)
+- **Projects:** folders that qualify, as above.
+- **Files:** every file in those folders except `node_modules`, `.venv`, `venv`, `vendor*`, `__pycache__`, `.git` and `.cache`.
+- **Lines of code:** non-blank lines in `.py .js .mjs .cjs .ts .html .css .sh`. Excluded: `dist/`, `data/`, bundles and minified files (average line over 300 chars, or files over 1 MB), and vendored libraries.
+- **Screenshots:** image files in each `screenshots/` folder.
+- **Test files:** code files in each `tests/` folder.
+- **Usage gauge:** `used_pct`, `checked_at` and `reset_date` from `/workspace/tokenmax/usage.json`, shown as-is.
+
+## Files
+`make_trailer.sh` (entry point), `trailer.py` (scan, art, ffmpeg/sox pipeline), `build/` (intermediates, recreated each run), `out/` (deliverables).

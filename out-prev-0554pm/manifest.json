@@ -1,0 +1,607 @@
+{
+ "rendered_at": "2026-10-07T17:55:19-04:00",
+ "render_seconds": 332,
+ "duration_s": 88.87,
+ "mp4": "/workspace/tokenmax/trailer/out/build-night-trailer-1080p.mp4",
+ "mp4_bytes": 73261266,
+ "mp4_streams": [
+  [
+   "video",
+   "h264",
+   1920,
+   1080
+  ],
+  [
+   "audio",
+   "aac",
+   null,
+   null
+  ]
+ ],
+ "mp4_720": "/workspace/tokenmax/trailer/out/build-night-trailer-720p.mp4",
+ "mp4_720_bytes": 17234289,
+ "mp4_720_duration_s": 88.87,
+ "mp4_720_settings": {
+  "crf": 24,
+  "maxrate_kbps": 1603,
+  "bytes": 17234289
+ },
+ "gif": "/workspace/tokenmax/trailer/out/build-night-trailer-720p.gif",
+ "gif_settings": {
+  "stills": 59,
+  "stills_per_project": 3,
+  "colors": 256,
+  "width": 1280,
+  "bytes": 11437025,
+  "duration_s": 88.87
+ },
+ "contact_sheet": "/workspace/tokenmax/trailer/out/contact-sheet.png",
+ "seconds_per_project": 3.76,
+ "fit_note": "25 projects do not fit at 5 s each inside 90 s; each project gets 3.76 s instead",
+ "projects": [
+  {
+   "slug": "bot-island",
+   "name": "Bot Island",
+   "pitch": "A living map of Boyd's Grok Bot fleet.",
+   "pitch_source_sentence": "A living map of Boyd's Grok Bot fleet.",
+   "screenshots_used": [
+    "bot-island/screenshots/live.png",
+    "bot-island/screenshots/network.png"
+   ],
+   "stats": {
+    "files": 38,
+    "loc": 2613,
+    "tests": 2,
+    "screenshots": 15
+   }
+  },
+  {
+   "slug": "bookmark-atlas",
+   "name": "Bookmark Atlas",
+   "pitch": "An interactive dark-mode explorer of everything Boyd (@xristafer) bookmarked on X and everything his research bots saved about posts he follows.",
+   "pitch_source_sentence": "An interactive dark-mode explorer of everything Boyd (@xristafer) bookmarked on X and everything his research bots saved about posts he follows.",
+   "screenshots_used": [
+    "bookmark-atlas/screenshots/02-galaxy-zoom.png",
+    "bookmark-atlas/screenshots/05-cards.png"
+   ],
+   "stats": {
+    "files": 29,
+    "loc": 1288,
+    "tests": 1,
+    "screenshots": 13
+   }
+  },
+  {
+   "slug": "boyd-wall",
+   "name": "Boyd Wall",
+   "pitch": "A 1920×1080 dark \"mission control\" dashboard for Boyd: SpaceX/Starship/Starlink launches with live T-minus countdowns…",
+   "pitch_source_sentence": "A 1920×1080 dark \"mission control\" dashboard for Boyd: SpaceX/Starship/Starlink launches with live T-minus countdowns, a Sports Desk for the Ravens, Terps, Chelsea and Orioles, Millersville weather with the week ahead, and a fleet strip showing every Grok Bot plus the TokenMax fuel gauge.",
+   "screenshots_used": [
+    "boyd-wall/screenshots/wall.png",
+    "boyd-wall/screenshots/launch-imminent.png"
+   ],
+   "stats": {
+    "files": 64,
+    "loc": 2044,
+    "tests": 3,
+    "screenshots": 10
+   }
+  },
+  {
+   "slug": "fridge-board",
+   "name": "Boyd Fridge Board",
+   "pitch": "A warm, kid-friendly progress board for Char (8th grade) and Vic (6th grade), sized for a kitchen tablet (1280×800 landscape).",
+   "pitch_source_sentence": "A warm, kid-friendly progress board for Char (8th grade) and Vic (6th grade), sized for a kitchen tablet (1280×800 landscape).",
+   "screenshots_used": [
+    "fridge-board/screenshots/01-home.png",
+    "fridge-board/screenshots/02-char.png"
+   ],
+   "stats": {
+    "files": 23,
+    "loc": 1153,
+    "tests": 2,
+    "screenshots": 6
+   }
+  },
+  {
+   "slug": "agent-playbook",
+   "name": "Agent Playbook",
+   "pitch": "An interactive field guide. It distills Boyd's bookmarks on personal agent systems, AI coding and pstack / @poteto into 11 concrete patterns…",
+   "pitch_source_sentence": "An interactive field guide. It distills Boyd's bookmarks on personal agent systems, AI coding and pstack / @poteto into 11 concrete patterns, then holds his Grok Bot fleet up against each one.",
+   "screenshots_used": [
+    "agent-playbook/screenshots/02-front-door.png",
+    "agent-playbook/screenshots/06-arena.png"
+   ],
+   "stats": {
+    "files": 24,
+    "loc": 874,
+    "tests": 1,
+    "screenshots": 10
+   }
+  },
+  {
+   "slug": "family-week",
+   "name": "Family Week",
+   "pitch": "A 1920×1080 board for the kitchen TV. It shows who has to be where, who drives each leg, and where the week breaks.",
+   "pitch_source_sentence": "A 1920×1080 board for the kitchen TV. It shows who has to be where, who drives each leg, and where the week breaks.",
+   "screenshots_used": [
+    "family-week/screenshots/conflict-day-oct15.png",
+    "family-week/screenshots/kiosk.png"
+   ],
+   "stats": {
+    "files": 35,
+    "loc": 1700,
+    "tests": 5,
+    "screenshots": 11
+   }
+  },
+  {
+   "slug": "ai-ops-atlas",
+   "name": "AI Ops Atlas",
+   "pitch": "Where can AI safely take busywork off KPD's plate, and in what order?",
+   "pitch_source_sentence": "Where can AI safely take busywork off KPD's plate, and in what order?",
+   "screenshots_used": [
+    "ai-ops-atlas/screenshots/01-overview.png",
+    "ai-ops-atlas/screenshots/05-roadmap.png"
+   ],
+   "stats": {
+    "files": 35,
+    "loc": 833,
+    "tests": 1,
+    "screenshots": 10
+   }
+  },
+  {
+   "slug": "fleet-funnies",
+   "name": "Fleet Funnies",
+   "pitch": "A daily comic strip starring Boyd's Grok Bots.",
+   "pitch_source_sentence": "A daily comic strip starring Boyd's Grok Bots.",
+   "screenshots_used": [
+    "fleet-funnies/screenshots/01-comics-page.png",
+    "fleet-funnies/screenshots/03-sunday-special.png"
+   ],
+   "stats": {
+    "files": 151,
+    "loc": 1543,
+    "tests": 1,
+    "screenshots": 7
+   }
+  },
+  {
+   "slug": "times-archive",
+   "name": "Times Archive",
+   "pitch": "A searchable archive of every saved edition of The Boyd Family Times, Boyd's daily household newspaper bot.",
+   "pitch_source_sentence": "A searchable archive of every saved edition of The Boyd Family Times, Boyd's daily household newspaper bot.",
+   "screenshots_used": [
+    "times-archive/screenshots/02-newsstand.png",
+    "times-archive/screenshots/03-reader.png"
+   ],
+   "stats": {
+    "files": 305,
+    "loc": 978,
+    "tests": 2,
+    "screenshots": 9
+   }
+  },
+  {
+   "slug": "hspt-quest",
+   "name": "HSPT Quest",
+   "pitch": "A game-style practice app for Charlotte's HSPT (Nov 17, 2026, at SJE).",
+   "pitch_source_sentence": "A game-style practice app for Charlotte's HSPT (Nov 17, 2026, at SJE).",
+   "screenshots_used": [
+    "hspt-quest/screenshots/desktop-01-home.png",
+    "hspt-quest/screenshots/phone-01-home.png"
+   ],
+   "stats": {
+    "files": 37,
+    "loc": 1346,
+    "tests": 6,
+    "screenshots": 16
+   }
+  },
+  {
+   "slug": "chopsticks",
+   "name": "Chopsticks",
+   "pitch": "Fly a Super Heavy booster home through gusting winds and set its catch pins down on the tower's chopsticks: slow, upright and centred.",
+   "pitch_source_sentence": "Fly a Super Heavy booster home through gusting winds and set its catch pins down on the tower's chopsticks: slow, upright and centred.",
+   "screenshots_used": [
+    "chopsticks/screenshots/01-attract-catch.png",
+    "chopsticks/screenshots/05-tower-cam-final-approach.png"
+   ],
+   "stats": {
+    "files": 43,
+    "loc": 1349,
+    "tests": 2,
+    "screenshots": 11
+   }
+  },
+  {
+   "slug": "llm-box-advisor",
+   "name": "Local LLM Box Advisor",
+   "pitch": "Could Boyd run his Grok Bot fleet, or parts of it, on his own hardware, and what would it take?",
+   "pitch_source_sentence": "Could Boyd run his Grok Bot fleet, or parts of it, on his own hardware, and what would it take?",
+   "screenshots_used": [
+    "llm-box-advisor/screenshots/01-overview.png",
+    "llm-box-advisor/screenshots/04-hardware.png"
+   ],
+   "stats": {
+    "files": 24,
+    "loc": 814,
+    "tests": 1,
+    "screenshots": 10
+   }
+  },
+  {
+   "slug": "trip-kit",
+   "name": "NCBA Trip Kit",
+   "pitch": "A one-page trip dashboard. It covers flights and confirmations, what's booked and what isn't, your four days merged with the conference agenda, AI sessions…",
+   "pitch_source_sentence": "A one-page trip dashboard. It covers flights and confirmations, what's booked and what isn't, your four days merged with the conference agenda, AI sessions worth catching, the Orlando weather outlook, a packing checklist, and what's happening at home while you're away.",
+   "screenshots_used": [
+    "trip-kit/screenshots/agenda-ai.png",
+    "trip-kit/screenshots/ai-picks.png"
+   ],
+   "stats": {
+    "files": 38,
+    "loc": 969,
+    "tests": 1,
+    "screenshots": 9
+   }
+  },
+  {
+   "slug": "pods-radio",
+   "name": "Pods Radio",
+   "pitch": "A daily radio show produced automatically from the YouTube and podcast feeds that Boyd's Pods bot watches…",
+   "pitch_source_sentence": "A daily radio show produced automatically from the YouTube and podcast feeds that Boyd's Pods bot watches: All-In, Moonshots (Peter Diamandis), Jesse Michels, and Bill Simmons / The Ringer.",
+   "screenshots_used": [
+    "pods-radio/screenshots/01-player-latest.png",
+    "pods-radio/screenshots/02-lens-segment-captions.png"
+   ],
+   "stats": {
+    "files": 271,
+    "loc": 1708,
+    "tests": 6,
+    "screenshots": 9
+   }
+  },
+  {
+   "slug": "chelsea-time-machine",
+   "name": "Blue Since Boyhood",
+   "pitch": "An interactive Chelsea history for Boyd, a Chelsea fan since the 1990s.",
+   "pitch_source_sentence": "An interactive Chelsea history for Boyd, a Chelsea fan since the 1990s.",
+   "screenshots_used": [
+    "chelsea-time-machine/screenshots/03-this-day.png",
+    "chelsea-time-machine/screenshots/04-finals-legends.png"
+   ],
+   "stats": {
+    "files": 90,
+    "loc": 745,
+    "tests": 1,
+    "screenshots": 9
+   }
+  },
+  {
+   "slug": "mission-control",
+   "name": "Mission Control",
+   "pitch": "A cinematic dark wall dashboard for Boyd.",
+   "pitch_source_sentence": "A cinematic dark wall dashboard for Boyd.",
+   "screenshots_used": [
+    "mission-control/screenshots/kiosk-next-launch-1440x900.png",
+    "mission-control/screenshots/wall-1440x900.png"
+   ],
+   "stats": {
+    "files": 32,
+    "loc": 1004,
+    "tests": 1,
+    "screenshots": 9
+   }
+  },
+  {
+   "slug": "season-book",
+   "name": "Season Book",
+   "pitch": "A yearbook-style scorebook for the Aug 1 – Dec 31, 2026 fall season, built from Boyd's Google Calendar and Gmail.",
+   "pitch_source_sentence": "A yearbook-style scorebook for the Aug 1 – Dec 31, 2026 fall season, built from Boyd's Google Calendar and Gmail.",
+   "screenshots_used": [
+    "season-book/screenshots/02-full-book.png",
+    "season-book/screenshots/04-char-aspire-scorebook.png"
+   ],
+   "stats": {
+    "files": 43,
+    "loc": 974,
+    "tests": 2,
+    "screenshots": 7
+   }
+  },
+  {
+   "slug": "orioles-2026",
+   "name": "Orioles 2026",
+   "pitch": "An interactive scrapbook of the Baltimore Orioles' 2026 regular season, built for Boyd by TokenMax.",
+   "pitch_source_sentence": "An interactive scrapbook of the Baltimore Orioles' 2026 regular season, built for Boyd by TokenMax.",
+   "screenshots_used": [
+    "orioles-2026/screenshots/03-months-splits.png",
+    "orioles-2026/screenshots/full-desktop.png"
+   ],
+   "stats": {
+    "files": 32,
+    "loc": 738,
+    "tests": 1,
+    "screenshots": 10
+   }
+  },
+  {
+   "slug": "sports-desk",
+   "name": "The Sports Desk",
+   "pitch": "A newspaper-style sports front for Boyd's teams (Ravens, Chelsea, Orioles, Terps men's basketball), with ESPN-style data viz.",
+   "pitch_source_sentence": "A newspaper-style sports front for Boyd's teams (Ravens, Chelsea, Orioles, Terps men's basketball), with ESPN-style data viz.",
+   "screenshots_used": [
+    "sports-desk/screenshots/desktop-1440x900.png",
+    "sports-desk/screenshots/phone-390-full.png"
+   ],
+   "stats": {
+    "files": 94,
+    "loc": 1273,
+    "tests": 1,
+    "screenshots": 4
+   }
+  },
+  {
+   "slug": "terps-preview",
+   "name": "Terps Hoops 2026–27 Preview",
+   "pitch": "A preseason magazine-style preview of Maryland men's basketball, built for Boyd (UMD) by TokenMax.",
+   "pitch_source_sentence": "A preseason magazine-style preview of Maryland men's basketball, built for Boyd (UMD) by TokenMax.",
+   "screenshots_used": [
+    "terps-preview/screenshots/00-best-cover.png",
+    "terps-preview/screenshots/00-cover.png"
+   ],
+   "stats": {
+    "files": 37,
+    "loc": 577,
+    "tests": 1,
+    "screenshots": 11
+   }
+  },
+  {
+   "slug": "ravens-film-room",
+   "name": "Ravens Film Room",
+   "pitch": "Interactive breakdown of the Baltimore Ravens' most recent completed game, plus a Scouting Report tab for the next game.",
+   "pitch_source_sentence": "Interactive breakdown of the Baltimore Ravens' most recent completed game, plus a Scouting Report tab for the next game.",
+   "screenshots_used": [
+    "ravens-film-room/screenshots/live.png",
+    "ravens-film-room/screenshots/mobile.png"
+   ],
+   "stats": {
+    "files": 47,
+    "loc": 1358,
+    "tests": 1,
+    "screenshots": 10
+   }
+  },
+  {
+   "slug": "fleet-yearbook",
+   "name": "The Fleet ’26",
+   "pitch": "A high-school-yearbook-style book about Boyd's Grok Bot fleet (TokenMax build night, Oct 7 2026).",
+   "pitch_source_sentence": "A high-school-yearbook-style book about Boyd's Grok Bot fleet (TokenMax build night, Oct 7 2026).",
+   "screenshots_used": [
+    "fleet-yearbook/screenshots/cover-1920x1080.png",
+    "fleet-yearbook/screenshots/spread-awards-1920x1080.png"
+   ],
+   "stats": {
+    "files": 42,
+    "loc": 973,
+    "tests": 1,
+    "screenshots": 6
+   }
+  },
+  {
+   "slug": "trivia-night",
+   "name": "Boyd Family Trivia Night",
+   "pitch": "A Jeopardy-style game for the kitchen TV.",
+   "pitch_source_sentence": "A Jeopardy-style game for the kitchen TV.",
+   "screenshots_used": [
+    "trivia-night/screenshots/02-board-A.png",
+    "trivia-night/screenshots/06-answer-with-source.png"
+   ],
+   "stats": {
+    "files": 126,
+    "loc": 842,
+    "tests": 2,
+    "screenshots": 11
+   }
+  },
+  {
+   "slug": "explainer-studio",
+   "name": "Explainer Studio",
+   "pitch": "Turns Jim's Interest Journal entries into short animated explainer videos…",
+   "pitch_source_sentence": "Turns Jim's Interest Journal entries into short animated explainer videos: 1080p30 H.264 MP4, 45–75 s, with a title card, 4–6 animated scenes (kinetic type, vector diagrams, charts), burned-in captions, a local TTS voiceover, a soft generated music bed, and a sources end card.",
+   "screenshots_used": [
+    "explainer-studio/screenshots/agents-go-to-work-oct-6_contact.png",
+    "explainer-studio/screenshots/spacex-stock-rally-oct-5-6_contact.png"
+   ],
+   "stats": {
+    "files": 170,
+    "loc": 2117,
+    "tests": 0,
+    "screenshots": 9
+   }
+  },
+  {
+   "slug": "hub",
+   "name": "TokenMax Hub",
+   "pitch": "One launch screen for everything TokenMax built on Oct 7, 2026, plus a one-tap launcher for every Grok Bot in Boyd's fleet.",
+   "pitch_source_sentence": "One launch screen for everything TokenMax built on Oct 7, 2026, plus a one-tap launcher for every Grok Bot in Boyd's fleet.",
+   "screenshots_used": [
+    "hub/screenshots/01-projects.png",
+    "hub/screenshots/02-tonights-build.png"
+   ],
+   "stats": {
+    "files": 270,
+    "loc": 781,
+    "tests": 2,
+    "screenshots": 4
+   }
+  }
+ ],
+ "skipped_folders": [
+  "chelsea-matchday",
+  "docket-pilot",
+  "math-arcade",
+  "recap",
+  "writing-studio"
+ ],
+ "stats": {
+  "projects": 25,
+  "files": 2100,
+  "loc": 30594,
+  "screenshots": 236,
+  "tests": 47
+ },
+ "usage": {
+  "label": "Grok Bot weekly included usage",
+  "used_pct": 40,
+  "checked_at": "2026-10-07T17:37-04:00",
+  "reset_date": "2026-10-08",
+  "checked_human": "5:37 p.m. ET, Oct 7",
+  "reset_human": "Oct 8, 2026"
+ },
+ "timeline": [
+  {
+   "segment": "Title",
+   "start_s": 0.0,
+   "duration_s": 3.97
+  },
+  {
+   "segment": "Bot Island",
+   "start_s": 3.27,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Bookmark Atlas",
+   "start_s": 6.3,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Boyd Wall",
+   "start_s": 9.33,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Boyd Fridge Board",
+   "start_s": 12.37,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Agent Playbook",
+   "start_s": 15.4,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Family Week",
+   "start_s": 18.43,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "AI Ops Atlas",
+   "start_s": 21.47,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Fleet Funnies",
+   "start_s": 24.5,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Times Archive",
+   "start_s": 27.53,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "HSPT Quest",
+   "start_s": 30.57,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Chopsticks",
+   "start_s": 33.6,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Local LLM Box Advisor",
+   "start_s": 36.63,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "NCBA Trip Kit",
+   "start_s": 39.67,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Pods Radio",
+   "start_s": 42.7,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Blue Since Boyhood",
+   "start_s": 45.73,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Mission Control",
+   "start_s": 48.77,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Season Book",
+   "start_s": 51.8,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Orioles 2026",
+   "start_s": 54.83,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "The Sports Desk",
+   "start_s": 57.87,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Terps Hoops 2026–27 Preview",
+   "start_s": 60.9,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Ravens Film Room",
+   "start_s": 63.93,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "The Fleet ’26",
+   "start_s": 66.97,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Boyd Family Trivia Night",
+   "start_s": 70.0,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Explainer Studio",
+   "start_s": 73.03,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "TokenMax Hub",
+   "start_s": 76.07,
+   "duration_s": 3.73
+  },
+  {
+   "segment": "Stats",
+   "start_s": 79.1,
+   "duration_s": 6.5
+  },
+  {
+   "segment": "End",
+   "start_s": 84.9,
+   "duration_s": 3.97
+  }
+ ]
+}

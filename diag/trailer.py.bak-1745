@@ -1,0 +1,591 @@
+#!/usr/bin/env python3
+"""Build Night Trailer: scans /workspace/tokenmax/*/ and renders a 1080p MP4 + 720p GIF + contact sheet.
+Every number comes from measuring the project folders or from usage.json. Nothing is invented."""
+import glob, json, math, os, re, shutil, subprocess, sys, datetime
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageStat
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TM = os.path.dirname(HERE)
+BUILD = os.path.join(HERE, 'build')
+OUT = os.path.join(HERE, 'out')
+W, H, FPS = 1920, 1080, 30
+XF = 0.7            # transition between segments (s)
+SHOT_XF = 0.5       # transition between screenshots inside a project (s)
+TARGET = 76.0       # aim for this many seconds total
+MAX_TOTAL = 89.5    # hard cap (spec: 60-90 s)
+MIN_PER = 3.6       # never shorter than this per project
+GIF_LIMIT = 15 * 1024 * 1024
+
+G = '/usr/share/fonts/truetype/sand-box/google'
+F_BEBAS = f'{G}/Bebas Neue/BebasNeue-Regular.ttf'
+F_INTER = f'{G}/Inter/Inter-VariableFont_opsz,wght.ttf'
+F_MONO = f'{G}/JetBrains Mono/JetBrainsMono-VariableFont_wght.ttf'
+ACCENT = (255, 181, 71)
+INK = (8, 10, 16)
+
+def sh(cmd, **kw):
+    r = subprocess.run(cmd, capture_output=True, text=True, **kw)
+    if r.returncode != 0:
+        sys.stderr.write(' '.join(map(str, cmd))[:2000] + '\n' + r.stderr[-4000:] + '\n')
+        raise SystemExit(f'command failed: {cmd[0]}')
+    return r.stdout
+
+def font(path, size, weight=None):
+    f = ImageFont.truetype(path, size)
+    if weight:
+        try:
+            f.set_variation_by_name(weight)
+        except Exception:
+            pass
+    return f
+
+def dur(p):
+    return float(sh(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', p]).strip())
+
+# ------------------------------------------------------------------ scan
+SKIP_DIRS = {'node_modules', '.venv', 'venv', '__pycache__', '.git', '.cache'}
+CODE_EXT = {'.py', '.js', '.mjs', '.cjs', '.ts', '.html', '.css', '.sh'}
+IMG_EXT = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
+BAD_SHOT = re.compile(r'offline|snapshot|sources|outage|empty|error|contact-sheet', re.I)
+
+def is_vendor(d):
+    return d in SKIP_DIRS or d == 'vendor' or d.startswith('vendor_')
+
+def walk(root):
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if not is_vendor(d)]
+        for fn in fns:
+            yield dp, fn
+
+def looks_generated(path):
+    try:
+        with open(path, 'rb') as f:
+            head = f.read(4096)
+    except Exception:
+        return True
+    lines = head.split(b'\n')
+    return os.path.getsize(path) > 1_000_000 or (len(head) > 2000 and len(head) / max(1, len(lines)) > 300)
+
+def measure(root):
+    files = loc = tests = shots = 0
+    for dp, fn in walk(root):
+        p = os.path.join(dp, fn); rel = os.path.relpath(p, root); parts = rel.split(os.sep)
+        files += 1
+        ext = os.path.splitext(fn)[1].lower()
+        if parts[0] == 'screenshots' and ext in IMG_EXT:
+            shots += 1
+        if parts[0] == 'tests' and ext in CODE_EXT | {'.py'}:
+            tests += 1
+        if ext in CODE_EXT and parts[0] not in ('dist', 'data') and not looks_generated(p):
+            with open(p, 'rb') as f:
+                loc += sum(1 for line in f if line.strip())
+    return {'files': files, 'loc': loc, 'tests': tests, 'screenshots': shots}
+
+EMOJI = re.compile('[\U0001F000-\U0001FFFF\u2600-\u27BF\uFE0F\u200D]')
+def md_clean(s):
+    s = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', s)
+    s = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', s)
+    s = s.replace('**', '').replace('__', '').replace('`', '')
+    s = re.sub(r'(?<!\w)\*(?!\s)([^*]+)\*', r'\1', s)
+    s = EMOJI.sub('', s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+def sentences(t):
+    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z"“])', t)
+    out = []
+    for p in parts:  # re-glue abbreviations like "Dr." / "St."
+        if out and re.search(r'\b(Dr|St|Mr|Mrs|Ms|vs|No|Vol|e\.g|i\.e)\.$', out[-1]):
+            out[-1] += ' ' + p
+        else:
+            out.append(p)
+    return out
+
+def readme_info(path):
+    txt = open(path, encoding='utf-8', errors='replace').read()
+    lines = txt.split('\n')
+    title, i = None, 0
+    for i, l in enumerate(lines):
+        if l.startswith('# '):
+            title = md_clean(l[2:]); break
+    name, sub = title or '', ''
+    for sep in (':', ' — ', ' · '):
+        if sep in name:
+            name, sub = name.split(sep, 1); break
+    para, inside_code = [], False
+    for l in lines[i + 1:]:
+        s = l.strip()
+        if s.startswith('```'):
+            inside_code = not inside_code; continue
+        if inside_code:
+            continue
+        if not s:
+            if para: break
+            continue
+        if re.match(r'^(#|-|\*\s|\||!\[|>|\d+\.)', s) or re.match(r'^\**(Live|Offline|Play|Built|Print|Player|Open|Run|Served|Screenshots|Smoke)\b', s):
+            if para: break
+            continue
+        para.append(s)
+    t = md_clean(' '.join(para))
+    t = re.sub(r'\s*\([^)]*[/_*#][^)]*\)', '', t)  # drop parentheticals that are file paths/globs
+    ss = sentences(t)
+    pitch = ss[0] if ss else (sub.strip() or '')
+    LIM = 160
+    if len(pitch) < 45 and len(ss) > 1 and (len(pitch) < 30 or len(pitch) + len(ss[1]) < LIM):
+        pitch = pitch + ' ' + ss[1]
+    full = pitch
+    if len(pitch) > LIM:
+        cut = pitch[:LIM]
+        k = max(cut.rfind(': '), cut.rfind(' — '), cut.rfind('; '))
+        if k < 60:
+            ks = [m.start() for m in re.finditer(r', (?=(a|an|the|and|plus|with|then|which|so)\b)', cut)]
+            k = ks[-1] if ks else -1
+        if k < 40:
+            k = cut.rfind(' ')
+        pitch = cut[:k].rstrip(' ,;:—') + '…'
+    return {'name': (name or '').strip(), 'subtitle': sub.strip(), 'pitch': pitch, 'pitch_source': full}
+
+def richness(p):
+    im = Image.open(p).convert('RGB'); im.thumbnail((320, 320))
+    a = np.asarray(im).astype(float)
+    rg, yb = a[..., 0] - a[..., 1], 0.5 * (a[..., 0] + a[..., 1]) - a[..., 2]
+    colorful = math.sqrt(rg.std() ** 2 + yb.std() ** 2) + 0.3 * math.sqrt(rg.mean() ** 2 + yb.mean() ** 2)
+    edges = np.asarray(im.convert('L').filter(ImageFilter.FIND_EDGES)).astype(float).mean()
+    return colorful + 2.0 * edges
+
+def pick_shots(folder, readme_txt, k=3):
+    cands = [p for p in sorted(glob.glob(os.path.join(folder, 'screenshots', '*'))) if os.path.splitext(p)[1].lower() in ('.png', '.jpg', '.jpeg')]
+    good = [p for p in cands if not BAD_SHOT.search(os.path.basename(p))] or cands
+    embeds = re.findall(r'!\[[^\]]*\]\(screenshots/([^)]+)\)', readme_txt)
+    ref = [os.path.join(folder, 'screenshots', e) for e in embeds if os.path.join(folder, 'screenshots', e) in good]
+    scored = sorted(good, key=lambda p: -richness(p))
+    fam = lambda p: re.sub(r'^\d+-', '', os.path.basename(p)).split('-')[0].split('.')[0].split('_')[0]
+    out = []
+    for p in ref[:1] + scored:
+        if p not in out and fam(p) not in {fam(q) for q in out}:
+            out.append(p)
+        if len(out) == k:
+            break
+    for p in scored:  # top up if diversity rule left us short
+        if len(out) >= min(k, len(good)):
+            break
+        if p not in out:
+            out.append(p)
+    return sorted(out, key=lambda p: (p not in ref[:1], cands.index(p)))
+
+def scan():
+    projects = []
+    for d in sorted(glob.glob(os.path.join(TM, '*/'))):
+        d = d.rstrip('/'); slug = os.path.basename(d)
+        if slug == 'trailer':
+            continue
+        rd = os.path.join(d, 'README.md')
+        shots = [p for p in glob.glob(os.path.join(d, 'screenshots', '*')) if os.path.splitext(p)[1].lower() in ('.png', '.jpg', '.jpeg')]
+        if not os.path.exists(rd) or not shots:
+            continue
+        info = readme_info(rd)
+        info.update({'slug': slug, 'path': d, 'shots': pick_shots(d, open(rd, errors='replace').read()), 'stats': measure(d),
+                     'mtime': max(os.path.getmtime(p) for p in [rd] + shots)})
+        projects.append(info)
+    # order: the hub (if any) last among projects, everything else by when it was finished
+    projects.sort(key=lambda p: (p['slug'] == 'hub', p['mtime']))
+    skipped = [os.path.basename(d.rstrip('/')) for d in sorted(glob.glob(os.path.join(TM, '*/'))) if os.path.basename(d.rstrip('/')) not in {p['slug'] for p in projects} | {'trailer'}]
+    return projects, skipped
+
+# ------------------------------------------------------------------ art
+def bg_image(seed=7):
+    rng = np.random.default_rng(seed)
+    y, x = np.mgrid[0:H, 0:W]
+    r = np.sqrt(((x - W * 0.5) / W) ** 2 + ((y - H * 0.42) / H) ** 2)
+    base = np.clip(1 - r * 1.35, 0, 1)
+    img = np.zeros((H, W, 3))
+    img[..., 0] = 8 + 30 * base ** 2; img[..., 1] = 10 + 26 * base ** 2; img[..., 2] = 18 + 48 * base ** 2
+    glow = np.exp(-(((x - W * 0.5) / (W * 0.32)) ** 2 + ((y - H * 1.05) / (H * 0.35)) ** 2))
+    img[..., 0] += 70 * glow; img[..., 1] += 42 * glow; img[..., 2] += 10 * glow
+    im = Image.fromarray(np.clip(img, 0, 255).astype('uint8'))
+    d = ImageDraw.Draw(im)
+    for _ in range(380):
+        sx, sy = rng.integers(0, W), rng.integers(0, int(H * 0.85)); b = int(rng.integers(60, 200)); s = rng.random()
+        d.ellipse([sx, sy, sx + (2 if s > 0.93 else 1), sy + (2 if s > 0.93 else 1)], fill=(b, b, min(255, b + 20)))
+    return im
+
+def text_layer(items):
+    """items: list of (text, font, fill, (x, y), anchor, tracking)"""
+    im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    for text, f, fill, xy, anchor, track in items:
+        if track:
+            # manual letter spacing, centred/left as requested
+            widths = [d.textlength(c, font=f) for c in text]
+            total = sum(widths) + track * (len(text) - 1)
+            x = xy[0] - total / 2 if anchor[0] == 'm' else xy[0]
+            for c, w_ in zip(text, widths):
+                d.text((x, xy[1]), c, font=f, fill=fill, anchor='l' + anchor[1]); x += w_ + track
+        else:
+            d.text(xy, text, font=f, fill=fill, anchor=anchor)
+    return im
+
+def wrap(text, f, maxw):
+    d = ImageDraw.Draw(Image.new('L', (1, 1))); words, lines, cur = text.split(), [], ''
+    for w_ in words:
+        t = (cur + ' ' + w_).strip()
+        if d.textlength(t, font=f) <= maxw:
+            cur = t
+        else:
+            lines.append(cur); cur = w_
+    if cur:
+        lines.append(cur)
+    return lines
+
+def lower_third(p, idx, n):
+    ys = np.arange(H)
+    grad = np.zeros((H, W, 4), dtype='uint8'); grad[..., :3] = (5, 7, 12)
+    bottom = np.clip((ys - (H - 600)) / 600, 0, 1) ** 1.15 * 248
+    top = np.clip((190 - ys) / 190, 0, 1) ** 1.5 * 200
+    grad[..., 3] = np.maximum(bottom, top)[:, None].astype('uint8')
+    base = Image.fromarray(grad, 'RGBA')
+    txt = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(txt)
+    fname = font(F_INTER, 92, 'Black'); fpitch = font(F_INTER, 38, 'Medium'); fsub = font(F_MONO, 24, 'Medium')
+    x0, ybase = 110, H - 110
+    lines = wrap(p['pitch'], fpitch, 1500)[:3]
+    y_p = ybase - 50 * (len(lines) - 1)
+    for i, l in enumerate(lines):
+        d.text((x0, y_p + 50 * i), l, font=fpitch, fill=(228, 232, 242, 255), anchor='ls')
+    y_n = y_p - 72
+    d.text((x0, y_n), p['name'], font=fname, fill=(255, 255, 255, 255), anchor='ls')
+    d.rectangle([x0, y_n - 124, x0 + 56, y_n - 119], fill=ACCENT + (255,))
+    s = p['stats']
+    meta = f"{p['slug']}/  ·  {s['loc']:,} lines  ·  {s['screenshots']} screenshots" + (f"  ·  {s['tests']} test file{'s' if s['tests'] != 1 else ''}" if s['tests'] else '')
+    d.text((x0 + 76, y_n - 112), meta.upper(), font=fsub, fill=ACCENT + (255,), anchor='ls')
+    shadow = Image.new('RGBA', (W, H), (0, 0, 0, 0)); shadow.putalpha(txt.getchannel('A').filter(ImageFilter.GaussianBlur(10)).point(lambda v: int(v * 0.85)))
+    return Image.alpha_composite(Image.alpha_composite(base, shadow), txt)
+
+def frame_card(kind, t, total, data):
+    """Animated stats card frame (PIL)."""
+    im = data['bg'].copy(); d = ImageDraw.Draw(im)
+    ease = lambda x: 1 - (1 - min(1, max(0, x))) ** 3
+    fk = font(F_MONO, 28, 'Bold'); fbig = font(F_BEBAS, 150); flab = font(F_INTER, 30, 'SemiBold'); fsm = font(F_MONO, 22, 'Regular')
+    a0 = ease(t / 0.6)
+    d.text((W / 2, 150), 'THE NIGHT IN NUMBERS', font=fk, fill=tuple(int(c * a0) for c in ACCENT), anchor='mm')
+    stats = data['stats']
+    items = [('PROJECTS', stats['projects']), ('FILES', stats['files']), ('LINES OF CODE', stats['loc']), ('SCREENSHOTS', stats['screenshots']), ('TEST FILES', stats['tests'])]
+    colw = (W - 220) / len(items)
+    for i, (lab, val) in enumerate(items):
+        k = ease((t - 0.25 - i * 0.18) / 1.6)
+        cx = 110 + colw * (i + 0.5)
+        v = int(round(val * k))
+        al = min(1, max(0, (t - 0.2 - i * 0.18) / 0.4))
+        col = tuple(int(255 * al) for _ in range(3))
+        d.text((cx, 360), f'{v:,}', font=fbig, fill=col, anchor='mm')
+        d.text((cx, 460), lab, font=flab, fill=tuple(int(c * al) for c in (170, 178, 195)), anchor='mm')
+    # usage gauge
+    u = data['usage']
+    gx0, gx1, gy = 260, W - 260, 690
+    ga = min(1, max(0, (t - 1.4) / 0.5))
+    d.text((gx0, gy - 50), (u['label'] or 'Usage').upper(), font=fk, fill=tuple(int(c * ga) for c in (200, 206, 220)), anchor='ls')
+    d.rounded_rectangle([gx0, gy, gx1, gy + 46], radius=23, outline=tuple(int(c * ga) for c in (90, 98, 120)), width=3)
+    if u['used_pct'] is not None:
+        frac = ease((t - 1.6) / 1.8) * u['used_pct'] / 100
+        if frac > 0.004:
+            d.rounded_rectangle([gx0 + 6, gy + 6, gx0 + 6 + (gx1 - gx0 - 12) * frac, gy + 40], radius=17, fill=tuple(int(c * ga) for c in ACCENT))
+        for q in (25, 50, 75):
+            qx = gx0 + (gx1 - gx0) * q / 100
+            d.line([qx, gy + 50, qx, gy + 62], fill=tuple(int(c * ga) for c in (90, 98, 120)), width=2)
+            d.text((qx, gy + 86), f'{q}%', font=fsm, fill=tuple(int(c * ga) for c in (120, 128, 150)), anchor='mm')
+        pct = int(round(ease((t - 1.6) / 1.8) * u['used_pct']))
+        d.text((gx1, gy - 50), f'{pct}% USED', font=font(F_BEBAS, 64), fill=tuple(int(c * ga) for c in ACCENT), anchor='rs')
+    note = f"From usage.json · checked {u['checked_human']} · resets {u['reset_human']}"
+    d.text((W / 2, gy + 150), note, font=fsm, fill=tuple(int(c * ga) for c in (140, 148, 168)), anchor='mm')
+    meth = 'Measured from the project folders: all files (vendored libraries and virtualenvs excluded), non-blank lines of .py/.js/.mjs/.html/.css/.sh (not dist, data, bundles or minified files), screenshots/ images, tests/ files.'
+    for i, l in enumerate(wrap(meth, fsm, 1500)):
+        d.text((W / 2, H - 120 + 30 * i), l, font=fsm, fill=tuple(int(c * ga * 0.8) for c in (120, 128, 150)), anchor='mm')
+    # fade in/out
+    fade = min(1, t / 0.4, (total - t) / 0.4) if total - t < 0.4 or t < 0.4 else 1
+    if fade < 1:
+        im = Image.blend(Image.new('RGB', (W, H), (0, 0, 0)), im, max(0, fade))
+    return im
+
+# ------------------------------------------------------------------ video pieces
+def prep16x9(src, dst, scale=3):
+    im = Image.open(src).convert('RGB')
+    w, h = im.size; tw = w; th = int(round(w * 9 / 16))
+    if th <= h:
+        top = 0 if h / w > 0.7 else (h - th) // 2   # tall pages: keep the top (hero) area
+        im = im.crop((0, top, tw, top + th))
+    else:
+        tw = int(round(h * 16 / 9)); left = (w - tw) // 2; im = im.crop((left, 0, left + tw, h))
+    im = im.resize((W * scale, H * scale), Image.LANCZOS)
+    im.save(dst, quality=93)
+
+MOVES = [  # z0, z1, x0, x1, y0, y1 (fractions of free space)
+    (1.00, 1.14, 0.50, 0.42, 0.40, 0.30),
+    (1.16, 1.02, 0.20, 0.60, 0.20, 0.50),
+    (1.04, 1.18, 0.70, 0.55, 0.10, 0.25),
+    (1.18, 1.05, 0.50, 0.50, 0.00, 0.60),
+    (1.02, 1.15, 0.10, 0.30, 0.60, 0.40),
+]
+
+def shot_clip(img, dst, seconds, move):
+    n = int(round(seconds * FPS)); z0, z1, x0, x1, y0, y1 = move
+    pr = f'(on/{max(1, n - 1)})'
+    vf = (f"zoompan=z='{z0}+({z1}-{z0})*{pr}':x='(iw-iw/zoom)*({x0}+({x1}-{x0})*{pr})':y='(ih-ih/zoom)*({y0}+({y1}-{y0})*{pr})'"
+          f":d={n}:s={W}x{H}:fps={FPS},format=yuv420p")
+    sh(['ffmpeg', '-y', '-v', 'error', '-i', img, '-vf', vf, '-frames:v', str(n), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', dst])
+
+def project_segment(p, idx, n, seconds, workdir):
+    os.makedirs(workdir, exist_ok=True)
+    shots = p['shots']
+    k = 3 if seconds >= 5.4 else (2 if seconds >= 3.4 else 1)
+    k = min(k, len(shots))
+    shots = shots[:k]
+    per = (seconds + SHOT_XF * (k - 1)) / k
+    clips = []
+    for j, s in enumerate(shots):
+        big = os.path.join(workdir, f'big{j}.jpg'); prep16x9(s, big)
+        c = os.path.join(workdir, f'shot{j}.mp4'); shot_clip(big, c, per, MOVES[(idx * 2 + j) % len(MOVES)]); clips.append(c)
+    lt = os.path.join(workdir, 'lower.png'); lower_third(p, idx, n).save(lt)
+    inputs = sum([['-i', c] for c in clips], []) + ['-loop', '1', '-t', f'{seconds:.3f}', '-i', lt]
+    fc, last = [], '[0:v]'
+    for j in range(1, len(clips)):
+        off = per * j - SHOT_XF * j
+        fc.append(f"{last}[{j}:v]xfade=transition={'fade' if j % 2 else 'smoothleft'}:duration={SHOT_XF}:offset={off:.3f}[s{j}]"); last = f'[s{j}]'
+    L = len(clips)
+    fc.append(f"[{L}:v]format=rgba,fade=t=in:st=0.25:d=0.6:alpha=1,fade=t=out:st={seconds - 0.55:.3f}:d=0.45:alpha=1[lt]")
+    fc.append(f"{last}[lt]overlay=x='-60*max(0\\,1-(t-0.25)/0.7)':y=0:shortest=1[ov]")
+    counter = f'{idx + 1:02d} / {n:02d}'
+    fc.append(f"[ov]drawtext=fontfile='{F_BEBAS}':text='{counter}':fontsize=54:fontcolor=white@0.95:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=110:y=72:alpha='min(1\\,max(0\\,(t-0.2)/0.5))',"
+              f"drawtext=fontfile='{F_BEBAS}':text='TOKENMAX  ·  BUILD NIGHT':fontsize=40:fontcolor=0xFFB547@0.95:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=w-tw-110:y=80:alpha='min(1\\,max(0\\,(t-0.2)/0.5))',"
+              f"trim=duration={seconds:.3f},format=yuv420p[v]")
+    dst = os.path.join(workdir, 'segment.mp4')
+    sh(['ffmpeg', '-y', '-v', 'error'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[v]', '-r', str(FPS), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', dst])
+    return dst, [os.path.relpath(s, TM) for s in shots], per
+
+def card_segment(dst, seconds, bg_path, layers):
+    """Background with slow zoom + PIL text layers with staggered alpha fades. layers: [(png, start, fade)]"""
+    n = int(round(seconds * FPS))
+    inputs = ['-loop', '1', '-i', bg_path] + sum([['-loop', '1', '-t', f'{seconds:.3f}', '-i', l[0]] for l in layers], [])
+    fc = [f"[0:v]scale={W*2}:{H*2},zoompan=z='1.0+0.06*on/{n}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d={n}:s={W}x{H}:fps={FPS},trim=duration={seconds:.3f}[b0]"]
+    last = '[b0]'
+    for i, (png, st, fd) in enumerate(layers, 1):
+        fc.append(f"[{i}:v]format=rgba,fade=t=in:st={st}:d={fd}:alpha=1[l{i}]")
+        fc.append(f"{last}[l{i}]overlay=0:0:shortest=1[o{i}]"); last = f'[o{i}]'
+    fc.append(f"{last}fade=t=in:st=0:d=0.5,fade=t=out:st={seconds - 0.8:.3f}:d=0.8,format=yuv420p[v]")
+    sh(['ffmpeg', '-y', '-v', 'error'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[v]', '-frames:v', str(n), '-r', str(FPS), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', dst])
+
+def stats_segment(dst, seconds, data):
+    n = int(round(seconds * FPS))
+    p = subprocess.Popen(['ffmpeg', '-y', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
+                          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', dst], stdin=subprocess.PIPE)
+    for i in range(n):
+        p.stdin.write(frame_card('stats', i / FPS, seconds, data).tobytes())
+    p.stdin.close(); p.wait()
+    if p.returncode:
+        raise SystemExit('stats render failed')
+
+# ------------------------------------------------------------------ music (sox)
+NOTE = {'A2': 110.0, 'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.0, 'A3': 220.0, 'B3': 246.94, 'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.0, 'A4': 440.0}
+def music(total, beat_in, beat_out, dst):
+    md = os.path.join(BUILD, 'music'); os.makedirs(md, exist_ok=True)
+    bpm = 84; beat = 60 / bpm; bar = 4 * beat
+    prog = [('A2', ['A3', 'C4', 'E4']), ('F3', ['F3', 'A3', 'C4']), ('C3', ['G3', 'C4', 'E4']), ('G3', ['G3', 'B3', 'D4'])]
+    chords = []
+    for i, (bass, notes) in enumerate(prog):
+        c = os.path.join(md, f'chord{i}.wav')
+        L = bar * 2 + 1.5
+        tones = ['sine', str(NOTE[bass] / 2)] + sum([['triangle', str(NOTE[x])] for x in notes], []) + ['sine', str(NOTE[notes[0]] * 2)]
+        nch = len(tones) // 2
+        sh(['sox', '-n', '-r', '48000', '-c', str(nch), c, 'synth', f'{L:.3f}'] + tones +
+           ['remix', f'1-{nch}', f'1-{nch}', 'lowpass', '1400', 'chorus', '0.6', '0.9', '55', '0.4', '0.25', '2', '-t', 'fade', 'h', '1.2', f'{L:.3f}', '1.4', 'gain', '-n', '-3'])
+        chords.append(c)
+    # lay chords end to end (two bars each), overlapping by 1.5 s
+    n_ch = int(math.ceil(total / (bar * 2))) + 1
+    pads = []
+    for i in range(n_ch):
+        pads.append(['|sox ' + chords[i % 4] + f' -p pad {i * bar * 2:.3f}'])
+    pad = os.path.join(md, 'pad.wav')
+    sh(['sox', '-m'] + [x[0] for x in pads] + [pad, 'trim', '0', f'{total:.3f}', 'reverb', '60', '50', '90', 'gain', '-n', '-6'])
+    # beat: soft kick on 1 & 3, rim-ish tick on 2 & 4, hats on eighths
+    kick = os.path.join(md, 'kick.wav'); hat = os.path.join(md, 'hat.wav'); tick = os.path.join(md, 'tick.wav')
+    sh(['sox', '-n', '-r', '48000', '-c', '2', kick, 'synth', '0.32', 'sine', '95:42', 'fade', 'l', '0', '0.32', '0.28', 'gain', '-n', '-2'])
+    sh(['sox', '-n', '-r', '48000', '-c', '2', hat, 'synth', '0.06', 'whitenoise', 'highpass', '7500', 'fade', '0', '0.06', '0.05', 'gain', '-n', '-16'])
+    sh(['sox', '-n', '-r', '48000', '-c', '2', tick, 'synth', '0.09', 'pinknoise', 'bandpass', '1800', '600', 'fade', '0', '0.09', '0.08', 'gain', '-n', '-12'])
+    hits = [f'|sox {kick} -p pad 0', f'|sox {kick} -p pad {2 * beat:.4f}', f'|sox {kick} -p gain -6 pad {3.5 * beat:.4f}',
+            f'|sox {tick} -p pad {beat:.4f}', f'|sox {tick} -p pad {3 * beat:.4f}'] + [f'|sox {hat} -p gain {-3 if i % 2 else 0} pad {i * beat / 2:.4f}' for i in range(8)]
+    barf = os.path.join(md, 'bar.wav')
+    sh(['sox', '-m'] + hits + [barf, 'trim', '0', f'{bar:.4f}'])
+    nbars = int(math.ceil((beat_out - beat_in) / bar)) + 1
+    beatf = os.path.join(md, 'beat.wav')
+    sh(['sox', barf, beatf, 'repeat', str(nbars - 1), 'trim', '0', f'{beat_out - beat_in:.3f}', 'fade', 't', '1.5', f'{beat_out - beat_in:.3f}', '2.0', 'pad', f'{beat_in:.3f}', '0'])
+    mix = os.path.join(md, 'mix.wav')
+    sh(['sox', '-m', '-v', '0.9', pad, '-v', '0.55', beatf, mix, 'trim', '0', f'{total:.3f}', 'fade', 't', '1.5', f'{total:.3f}', '3.0', 'gain', '-n', '-1'])
+    shutil.copy(mix, dst)
+
+# ------------------------------------------------------------------ gif
+def gif_events(segs, starts, durs, shot_info, total, shots_per_project=3):
+    """[(show_from, sample_time)] in trailer time: one still per screenshot, title/end held, stats at 1 fps."""
+    ev = []
+    pi = 0
+    for i, ((name, _), st, d) in enumerate(zip(segs, starts, durs)):
+        if name == 'Title':
+            ev.append((0.0, st + 3.4))
+        elif name == 'Stats':
+            for k in range(7):
+                ev.append((st + k * d / 7, min(st + d - 0.5, st + 0.6 + k * d / 7)))
+        elif name == 'End':
+            ev.append((st, st + 3.2))
+        else:
+            k, shot_len = shot_info[pi]; pi += 1
+            use = list(range(k))[:shots_per_project]
+            for n_, j in enumerate(use):
+                t_start = st + (j * (shot_len - SHOT_XF) if n_ else 0)
+                t_end = st + (j + 1) * (shot_len - SHOT_XF) if j < k - 1 else st + d
+                sample = max(st + 1.2, (t_start + t_end) / 2)
+                ev.append((t_start, min(sample, st + d - 0.6)))
+    return ev
+
+def make_gif(mp4, gif, segs, starts, durs, shot_info, total):
+    gd = os.path.join(BUILD, 'gif'); os.makedirs(gd, exist_ok=True)
+    tries = [(3, 256), (3, 192), (3, 128), (3, 96), (2, 96), (2, 64), (1, 64)]
+    for spp, colors in tries:
+        ev = gif_events(segs, starts, durs, shot_info, total, spp)
+        lst = []
+        for n_, (t0_, ts) in enumerate(ev):
+            fp = os.path.join(gd, f'f{n_:03d}.png')
+            if not os.path.exists(fp + f'.{ts:.2f}'):
+                sh(['ffmpeg', '-y', '-v', 'error', '-ss', f'{ts:.3f}', '-i', mp4, '-frames:v', '1', '-vf', 'scale=1280:720:flags=lanczos', fp])
+            t1_ = ev[n_ + 1][0] if n_ + 1 < len(ev) else total
+            lst.append((fp, max(0.1, t1_ - t0_)))
+        cl = os.path.join(gd, 'list.txt')
+        with open(cl, 'w') as f:
+            for fp, d_ in lst:
+                f.write(f"file '{fp}'\nduration {d_:.3f}\n")
+            f.write(f"file '{lst[-1][0]}'\n")
+        pal = os.path.join(gd, 'pal.png')
+        sh(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', cl, '-vf', f'palettegen=max_colors={colors}:stats_mode=full', pal])
+        sh(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', cl, '-i', pal, '-lavfi', '[0:v][1:v]paletteuse=dither=none:diff_mode=rectangle',
+            '-fps_mode', 'vfr', '-loop', '0', gif])
+        size = os.path.getsize(gif)
+        print(f'  gif stills/project={spp} colors={colors}: {len(lst)} frames, {size / 1048576:.1f} MB', flush=True)
+        for fp, _ in lst:
+            os.remove(fp)
+        if size < GIF_LIMIT:
+            return {'stills': len(lst), 'stills_per_project': spp, 'colors': colors, 'bytes': size, 'duration_s': round(sum(d for _, d in lst), 2)}
+    raise SystemExit('could not get GIF under 15 MB')
+
+# ------------------------------------------------------------------ main
+def human_time(iso):
+    if not iso:
+        return 'unknown'
+    try:
+        d = datetime.datetime.fromisoformat(iso)
+        return d.strftime('%-I:%M %p ET, %b %-d').replace('AM', 'a.m.').replace('PM', 'p.m.')
+    except Exception:
+        return iso
+
+def main():
+    t0 = datetime.datetime.now()
+    if os.path.isdir(BUILD):
+        shutil.rmtree(BUILD)
+    os.makedirs(BUILD); os.makedirs(OUT, exist_ok=True)
+    projects, skipped = scan()
+    N = len(projects)
+    if N == 0:
+        raise SystemExit('no projects with README + screenshots found')
+    T_TITLE, T_STATS, T_END = 4.6, 7.0, 4.6
+    n_seg = N + 3
+    per = (TARGET - T_TITLE - T_STATS - T_END + XF * (n_seg - 1)) / N
+    per = max(5.0, min(8.0, per))
+    total_est = T_TITLE + T_STATS + T_END + per * N - XF * (n_seg - 1)
+    fit_note = None
+    if total_est > MAX_TOTAL:
+        # too many projects for 5 s each inside 90 s: keep the 90 s cap, tighten the cards, and shorten project segments
+        T_TITLE, T_STATS, T_END = 4.0, 6.5, 4.0
+        per = max(MIN_PER, (MAX_TOTAL - T_TITLE - T_STATS - T_END + XF * (n_seg - 1)) / N)
+        total_est = T_TITLE + T_STATS + T_END + per * N - XF * (n_seg - 1)
+        fit_note = f'{N} projects do not fit at 5 s each inside 90 s; each project gets {per:.2f} s instead'
+        print('NOTE:', fit_note)
+    print(f'{N} projects, {per:.2f}s each, ~{total_est:.1f}s total; skipped (no README or screenshots yet): {skipped}')
+
+    agg = {'projects': N}
+    for k in ('files', 'loc', 'screenshots', 'tests'):
+        agg[k] = sum(p['stats'][k] for p in projects)
+    u = json.load(open(os.path.join(TM, 'usage.json')))
+    usage = {'label': u.get('label'), 'used_pct': u.get('used_pct'), 'checked_at': u.get('checked_at'), 'reset_date': u.get('reset_date'),
+             'checked_human': human_time(u.get('checked_at')),
+             'reset_human': datetime.date.fromisoformat(u['reset_date']).strftime('%b %-d, %Y') if u.get('reset_date') else 'unknown'}
+
+    json.dump({'stats': agg, 'usage': usage, 'projects': [p['slug'] for p in projects]}, open(os.path.join(BUILD, 'rendered-stats.json'), 'w'), indent=1)
+    bg = bg_image(); bgp = os.path.join(BUILD, 'bg.png'); bg.save(bgp)
+    segs = []
+    # title
+    fbig = font(F_BEBAS, 250); fsmall = font(F_INTER, 40, 'SemiBold'); fdate = font(F_MONO, 34, 'Medium')
+    l1 = text_layer([('TOKENMAX PRESENTS:', fsmall, (200, 206, 222, 255), (W / 2, 330), 'mm', 14)]); l1p = os.path.join(BUILD, 't1.png'); l1.save(l1p)
+    l2 = text_layer([('BUILD NIGHT', fbig, (255, 255, 255, 255), (W / 2, 540), 'mm', 10)]); l2p = os.path.join(BUILD, 't2.png'); l2.save(l2p)
+    l3im = text_layer([('OCT 7, 2026', fdate, ACCENT + (255,), (W / 2, 720), 'mm', 18)]); ImageDraw.Draw(l3im).rectangle([W / 2 - 60, 668, W / 2 + 60, 672], fill=ACCENT + (255,))
+    l3p = os.path.join(BUILD, 't3.png'); l3im.save(l3p)
+    l4 = text_layer([(f'{N} projects built from Boyd\'s leftover Grok Bot usage', font(F_INTER, 30, 'Regular'), (160, 168, 188, 255), (W / 2, 800), 'mm', 0)]); l4p = os.path.join(BUILD, 't4.png'); l4.save(l4p)
+    title = os.path.join(BUILD, 'seg00_title.mp4'); card_segment(title, T_TITLE, bgp, [(l1p, 0.3, 0.7), (l2p, 0.8, 0.9), (l3p, 1.6, 0.7), (l4p, 2.2, 0.7)])
+    segs.append(('Title', title))
+    manifest_projects = []; shot_info = []
+    for i, p in enumerate(projects):
+        print(f'  [{i + 1}/{N}] {p["slug"]}', flush=True)
+        s, used, shot_len = project_segment(p, i, N, per, os.path.join(BUILD, f'p{i:02d}_{p["slug"]}'))
+        segs.append((p['name'], s)); shot_info.append((len(used), shot_len))
+        manifest_projects.append({'slug': p['slug'], 'name': p['name'], 'pitch': p['pitch'], 'pitch_source_sentence': p['pitch_source'], 'screenshots_used': used, 'stats': p['stats']})
+    st = os.path.join(BUILD, 'seg_stats.mp4'); stats_segment(st, T_STATS, {'bg': bg, 'stats': agg, 'usage': usage}); segs.append(('Stats', st))
+    e1 = text_layer([('Built before the reset.', font(F_INTER, 96, 'Bold'), (255, 255, 255, 255), (W / 2, 500), 'mm', 0)]); e1p = os.path.join(BUILD, 'e1.png'); e1.save(e1p)
+    e2 = text_layer([(f"{usage['label'] or 'Weekly usage'} resets {usage['reset_human']}", font(F_INTER, 34, 'Regular'), (175, 182, 200, 255), (W / 2, 600), 'mm', 0),
+                     ('TOKENMAX  ·  FOR BOYD', font(F_BEBAS, 46), ACCENT + (255,), (W / 2, 700), 'mm', 6)]); e2p = os.path.join(BUILD, 'e2.png'); e2.save(e2p)
+    end = os.path.join(BUILD, 'seg99_end.mp4'); card_segment(end, T_END, bgp, [(e1p, 0.4, 0.9), (e2p, 1.3, 0.8)]); segs.append(('End', end))
+
+    # assemble with xfade
+    durs = [dur(s) for _, s in segs]
+    trans = ['fade', 'smoothleft', 'fadeblack', 'smoothup', 'circleopen', 'smoothright', 'dissolve', 'wipeleft']
+    inputs = sum([['-i', s] for _, s in segs], [])
+    fc, last, acc, starts = [], '[0:v]', durs[0], [0.0]
+    for i in range(1, len(segs)):
+        off = acc - XF
+        tr = 'fade' if i in (1, len(segs) - 1) else trans[i % len(trans)]
+        fc.append(f'{last}[{i}:v]xfade=transition={tr}:duration={XF}:offset={off:.3f}[x{i}]'); last = f'[x{i}]'
+        starts.append(off); acc = off + durs[i]
+    total = acc
+    silent = os.path.join(BUILD, 'video.mp4')
+    fc.append(f'{last}format=yuv420p[v]')
+    sh(['ffmpeg', '-y', '-v', 'error'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[v]', '-r', str(FPS), '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', silent])
+    total = dur(silent)
+    wav = os.path.join(BUILD, 'music.wav'); music(total, starts[1], starts[-1] + 0.6, wav)
+    mp4 = os.path.join(OUT, 'build-night-trailer-1080p.mp4')
+    sh(['ffmpeg', '-y', '-v', 'error', '-i', silent, '-i', wav, '-map', '0:v', '-map', '1:a', '-af', 'loudnorm=I=-24:TP=-3:LRA=9', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000',
+        '-shortest', '-movflags', '+faststart', mp4])
+    # GIF (720p, under 15 MB): same timeline as the MP4, but each shot is held as one still frame so it compresses.
+    gif = os.path.join(OUT, 'build-night-trailer-720p.gif')
+    gif_settings = make_gif(mp4, gif, segs, starts, durs, shot_info, total)
+    # contact sheet: one frame from the middle of each segment
+    frames = []
+    for (name, _), st0, d in zip(segs, starts, durs):
+        tmid = st0 + d * 0.55; fp = os.path.join(BUILD, f'cs_{len(frames):02d}.png')
+        sh(['ffmpeg', '-y', '-v', 'error', '-ss', f'{tmid:.2f}', '-i', mp4, '-frames:v', '1', '-vf', 'scale=480:270', fp]); frames.append((name, tmid, fp))
+    cols = 5 if len(frames) > 20 else 4; rows = math.ceil(len(frames) / cols); tw, th, pad, lab = 480, 270, 24, 44
+    sheet = Image.new('RGB', (cols * tw + (cols + 1) * pad, 150 + rows * (th + lab + pad) + pad), (10, 12, 18)); d = ImageDraw.Draw(sheet)
+    d.text((pad, 40), 'TOKENMAX PRESENTS: BUILD NIGHT, OCT 7 2026', font=font(F_BEBAS, 64), fill=(255, 255, 255))
+    d.text((pad, 112), f'Contact sheet · {total:.1f} s · 1920×1080 · {N} projects · rendered {datetime.datetime.now().strftime("%-I:%M %p ET")}', font=font(F_MONO, 22), fill=ACCENT)
+    fl = font(F_INTER, 20, 'SemiBold')
+    for i, (name, tm, fp) in enumerate(frames):
+        r, c = divmod(i, cols); x = pad + c * (tw + pad); y = 150 + pad + r * (th + lab + pad)
+        sheet.paste(Image.open(fp), (x, y)); d.text((x, y + th + 10), f'{int(tm // 60)}:{tm % 60:04.1f}  {name}', font=fl, fill=(210, 214, 226))
+    cs = os.path.join(OUT, 'contact-sheet.png'); sheet.save(cs)
+    manifest = {'rendered_at': datetime.datetime.now().astimezone().isoformat(timespec='seconds'), 'render_seconds': round((datetime.datetime.now() - t0).total_seconds()),
+                'duration_s': round(dur(mp4), 2), 'mp4': mp4, 'gif': gif, 'gif_settings': gif_settings, 'contact_sheet': cs,
+                'seconds_per_project': round(per, 2), 'fit_note': fit_note, 'projects': manifest_projects, 'skipped_folders': skipped,
+                'stats': agg, 'usage': usage,
+                'timeline': [{'segment': n_, 'start_s': round(s_, 2), 'duration_s': round(d_, 2)} for (n_, _), s_, d_ in zip(segs, starts, durs)]}
+    json.dump(manifest, open(os.path.join(OUT, 'manifest.json'), 'w'), indent=1, ensure_ascii=False)
+    print(json.dumps({k: manifest[k] for k in ('duration_s', 'stats', 'gif_settings', 'render_seconds')}))
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '--scan':
+        ps, sk = scan()
+        for p in ps:
+            print(f"{p['slug']:18} | {p['name']} | {p['pitch']}\n{'':18}   shots: {[os.path.basename(s) for s in p['shots']]} stats: {p['stats']}")
+        print('skipped:', sk)
+    else:
+        main()
