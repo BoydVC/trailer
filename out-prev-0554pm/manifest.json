@@ -90,8 +90,8 @@
   {
    "slug": "fridge-board",
    "name": "Boyd Fridge Board",
-   "pitch": "A warm, kid-friendly progress board for Char (8th grade) and Vic (6th grade), sized for a kitchen tablet (1280×800 landscape).",
-   "pitch_source_sentence": "A warm, kid-friendly progress board for Char (8th grade) and Vic (6th grade), sized for a kitchen tablet (1280×800 landscape).",
+   "pitch": "A warm, kid-friendly progress board for Alex (8th grade) and Sam (6th grade), sized for a kitchen tablet (1280×800 landscape).",
+   "pitch_source_sentence": "A warm, kid-friendly progress board for Alex (8th grade) and Sam (6th grade), sized for a kitchen tablet (1280×800 landscape).",
    "screenshots_used": [
     "fridge-board/screenshots/01-home.png",
     "fridge-board/screenshots/02-char.png"
@@ -186,8 +186,8 @@
   {
    "slug": "hspt-quest",
    "name": "HSPT Quest",
-   "pitch": "A game-style practice app for Charlotte's HSPT (Nov 17, 2026, at SJE).",
-   "pitch_source_sentence": "A game-style practice app for Charlotte's HSPT (Nov 17, 2026, at SJE).",
+   "pitch": "A game-style practice app for Alex's HSPT (Nov 17, 2026, at Northside Academy).",
+   "pitch_source_sentence": "A game-style practice app for Alex's HSPT (Nov 17, 2026, at Northside Academy).",
    "screenshots_used": [
     "hspt-quest/screenshots/desktop-01-home.png",
     "hspt-quest/screenshots/phone-01-home.png"
